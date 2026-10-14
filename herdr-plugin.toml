@@ -1,0 +1,18 @@
+id = "shyam.conversation-notes"
+name = "Conversation Notes"
+version = "0.3.2"
+min_herdr_version = "0.9.0"
+description = "Per-conversation Markdown notes with autosave, clipboard, and optional AI reply imports."
+platforms = ["macos", "linux"]
+
+[[actions]]
+id = "toggle"
+title = "Open conversation notes"
+contexts = ["pane"]
+command = ["python3", "notes.py", "toggle"]
+
+[[panes]]
+id = "editor"
+title = "Notes"
+placement = "split"
+command = ["python3", "notes.py", "editor"]

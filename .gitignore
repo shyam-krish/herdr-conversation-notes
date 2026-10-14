@@ -1,0 +1,32 @@
+# Python bytecode and local tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environments and credentials
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# macOS and editor temporary files
+.DS_Store
+._*
+*.swp
+*.swo
+*~
+*.bak
+
+# Note storage if HERDR_PLUGIN_STATE_DIR points at this directory
+/notes/
+/aliases/
+/panels/
+/*.lock
+/.notes-*
