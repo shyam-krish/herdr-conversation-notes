@@ -87,9 +87,14 @@ undo in this row operate on the instruction. Switching conversations dismisses i
 
 Submitting sends the current note and optional instruction to OpenAI's Responses
 API with `gpt-5.6-luna`,
-reasoning `none`, and `store: false`. It uses the exported `OPENAI_API_KEY`;
-if Herdr did not inherit it, the worker starts through a login zsh to read
-`~/.zprofile`. The key is never saved in the plugin or put in command arguments.
+reasoning `none`, and `store: false`. Each request starts the worker through a
+login zsh, refreshing `OPENAI_API_KEY` from `~/.zprofile` even if the persistent
+Herdr server inherited an older key. An updated export takes effect on the next
+request; detaching and reattaching Herdr does not refresh its server environment.
+If the profile does not replace the key, the inherited value is kept. On systems
+without `/bin/zsh`, the worker uses the inherited environment directly. The key
+is never saved in the plugin or put in command arguments. After installing this
+update, close notes with **Ctrl+Q** and reopen with **Ctrl+B, z** once.
 
 The prompt requests only flat `- ` bullets, preserving distinct details, names,
 links, questions, and uncertainty. It permits light wording cleanup and merging

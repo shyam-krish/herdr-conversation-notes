@@ -1,6 +1,6 @@
 id = "shyam.conversation-notes"
 name = "Conversation Notes"
-version = "0.3.2"
+version = "0.3.3"
 min_herdr_version = "0.9.0"
 description = "Per-conversation Markdown notes with autosave, clipboard, and optional AI reply imports."
 platforms = ["macos", "linux"]

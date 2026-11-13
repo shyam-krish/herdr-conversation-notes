@@ -100,18 +100,53 @@ class RequestTests(unittest.TestCase):
                 organizer.request_notes("a note", "")
             opener.assert_not_called()
 
-    def test_worker_uses_inherited_key_or_login_zprofile_without_key_arguments(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-key"}):
+    def test_worker_refreshes_login_environment_without_key_arguments(self):
+        for inherited in ["secret-key", ""]:
+            with self.subTest(inherited=bool(inherited)), \
+                 patch.dict(os.environ, {"OPENAI_API_KEY": inherited}), \
+                 patch("organizer.Path.is_file", return_value=True):
+                argv = organizer.worker_command()
+                self.assertEqual(argv[:2], ["/bin/zsh", "-lc"])
+                self.assertEqual(argv[2], 'exec "$1" "$2" --worker')
+                self.assertNotIn("secret-key", " ".join(argv))
+
+    def test_worker_without_zsh_keeps_direct_inherited_environment_support(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-key"}), \
+             patch("organizer.Path.is_file", return_value=False):
             argv = organizer.worker_command()
-            self.assertEqual(argv[0], sys.executable)
-            self.assertNotIn("secret-key", " ".join(argv))
-        with patch.dict(os.environ, {}, clear=True):
-            argv = organizer.worker_command()
-            self.assertEqual(argv[:2], ["/bin/zsh", "-lc"])
-            self.assertEqual(argv[2], 'exec "$1" "$2" --worker')
+        self.assertEqual(argv, [sys.executable, str(Path(organizer.__file__).resolve()), "--worker"])
+        self.assertNotIn("secret-key", " ".join(argv))
 
 
 class WorkerTests(unittest.IsolatedAsyncioTestCase):
+    @unittest.skipUnless(Path("/bin/zsh").is_file(), "login environment refresh requires zsh")
+    async def test_login_worker_uses_current_profile_and_preserves_inherited_fallback(self):
+        with tempfile.TemporaryDirectory(prefix="notes worker ") as tmp:
+            root = Path(tmp)
+            script = root / "fake worker.py"
+            script.write_text('''import json, os, sys
+payload = json.load(sys.stdin)
+labels = {"test-inherited-key": "inherited", "test-profile-key": "profile", "test-rotated-key": "rotated"}
+label = labels.get(os.environ.get("OPENAI_API_KEY"), "missing")
+print(json.dumps({"text": "- " + label + ": " + payload["note"].replace(chr(10), chr(10) + "- ")}))
+''')
+            profile = root / ".zprofile"
+            cases = [("test-inherited-key", None, "inherited"),
+                     (None, "test-profile-key", "profile"),
+                     ("test-inherited-key", "test-profile-key", "profile")]
+            for inherited, configured, expected in cases:
+                with self.subTest(inherited=bool(inherited), profile=bool(configured)):
+                    profile.write_text(f"export OPENAI_API_KEY={configured}\n" if configured else "")
+                    env = {"ZDOTDIR": tmp, "PATH": os.defpath}
+                    if inherited:
+                        env["OPENAI_API_KEY"] = inherited
+                    with patch.dict(os.environ, env, clear=True), patch("organizer.__file__", str(script)):
+                        self.assertEqual(await organizer.organize_text("first note\nsecond line"),
+                                         f"- {expected}: first note\n- second line")
+                        if configured:
+                            profile.write_text("export OPENAI_API_KEY=test-rotated-key\n")
+                            self.assertEqual(await organizer.organize_text("next note"), "- rotated: next note")
+
     async def test_worker_protocol_passes_organization_instruction_via_stdin(self):
         code = 'import json,sys; p=json.load(sys.stdin); print(json.dumps({"text":"- "+p["organization_prompt"]+": "+p["note"]}))'
         with patch("organizer.worker_command", return_value=[sys.executable, "-c", code]):

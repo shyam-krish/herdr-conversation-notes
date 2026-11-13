@@ -1,5 +1,23 @@
 # Validation
 
+## Version 0.3.3 — 2026-10-21
+
+- Fixed key rotation while Herdr's persistent server still holds an older
+  `OPENAI_API_KEY`. Every explicitly submitted AI action now launches its worker
+  through a login zsh, allowing the current `~/.zprofile` export to replace that
+  inherited value. The inherited key remains available if the profile does not
+  replace it; systems without `/bin/zsh` retain direct environment support.
+- 75 automated tests passed. New checks run actual workers with temporary shell
+  profiles and synthetic keys, covering stale/missing inherited keys, rotation
+  between requests without changing the parent environment, inherited fallback,
+  multiline stdin, paths with spaces, and the no-zsh launch path. Existing worker
+  cancellation, timeout, import, editing, storage, and wrapping checks passed.
+- A synthetic request using the current login-shell key succeeded. A second live
+  check started the patched worker from the stale inherited environment and also
+  succeeded. Only synthetic text was sent; no real notes were edited or sent.
+- Close notes with Ctrl+Q and reopen with prefix+z once to load this update.
+  Detaching and reattaching Herdr keeps its server running and is unnecessary.
+
 ## Version 0.3.2 — 2026-10-01
 
 - Ctrl+O now opens an optional instruction row. Enter submits, a blank Enter

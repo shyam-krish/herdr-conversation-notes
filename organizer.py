@@ -121,10 +121,11 @@ def request_notes(note: str, api_key: str, *, extraction_prompt: str | None = No
 
 def worker_command() -> list[str]:
     script = str(Path(__file__).resolve())
-    if os.environ.get("OPENAI_API_KEY"):
+    if not Path("/bin/zsh").is_file():
         return [sys.executable, script, "--worker"]
-    # Herdr may have started before the key was exported. A login zsh reads
-    # ~/.zprofile; the key stays in the child's environment, never its arguments.
+    # A persistent Herdr server can retain a revoked key after reattaching.
+    # Refresh through ~/.zprofile on every explicit request, keeping the inherited
+    # key if the profile does not replace it. Never put a key in the arguments.
     return ["/bin/zsh", "-lc", 'exec "$1" "$2" --worker',
             "notes-organizer", sys.executable, script]
 
