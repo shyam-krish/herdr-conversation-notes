@@ -1,0 +1,7 @@
+{
+  "name": "conversation-notes-gui",
+  "private": true,
+  "type": "module",
+  "description": "Herdr app mod for Conversation Notes; package.json only marks ES modules for the headless tests.",
+  "scripts": { "test": "node --test --test-timeout=60000 tests/*.test.mjs" }
+}

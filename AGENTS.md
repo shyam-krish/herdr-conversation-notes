@@ -2,10 +2,18 @@
 
 ## Scope and purpose
 
-This directory is the live installation and source of the personal Herdr plugin
-`shyam.conversation-notes`. Work here for notes features; this is separate from the
-Axiom Wallet application. Read `README.md` for current usage and `VALIDATION.md`
-for previously recorded checks. Inspect the code before relying on those records.
+This directory is the live installation and source of the personal Conversation
+Notes plugin, in two implementations that share one note store:
+
+- `tui/`: the terminal Herdr plugin `shyam.conversation-notes` (Python). Herdr
+  links it from this folder (`herdr plugin link …/tui`).
+- `gui/`: the Herdr app (desktop) mod `conversation-notes` (JavaScript), a port of
+  the TUI plugin. `~/.config/herdr-app/mods/conversation-notes` is a symlink here.
+
+Work here for notes features; this is separate from the Axiom Wallet application.
+Read each folder's `README.md` for current usage and `VALIDATION.md` for previously
+recorded checks. Inspect the code before relying on those records. A behavior change
+belongs in both implementations unless it is specific to one host.
 
 The user wants personal notes tied to each coding conversation, outside the chat:
 - A minimal right-hand panel that can be opened or hidden when needed.
@@ -24,24 +32,40 @@ only when the user explicitly requests them.
 
 | File | Responsibility |
 | --- | --- |
-| `herdr-plugin.toml` | Plugin identity, version, toggle action, editor pane |
-| `notes.py` | CLI entry points: `toggle`, `editor`, and `path` |
-| `herdr_host.py` | Herdr socket API, source pane selection, panel lifecycle |
-| `editor.py` | prompt_toolkit editor, shortcuts, autosave, async AI operations |
-| `notes_store.py` | Note identity, metadata, migration, locks, atomic writes |
-| `word_wrap.py` | Display-only wrapping and cursor/selection mapping |
-| `transcripts.py` | Correct-session Codex and Claude final-reply readers |
-| `organizer.py` | Prompts, Responses API worker, output validation, cancellation |
-| `tests/` | Storage, editor, transcript, identity, API, and wrapping checks |
-| `vendor/` | Vendored dependencies from `requirements.txt` |
+| `tui/herdr-plugin.toml` | Plugin identity, version, toggle action, editor pane |
+| `tui/notes.py` | CLI entry points: `toggle`, `editor`, and `path` |
+| `tui/herdr_host.py` | Herdr socket API, source pane selection, panel lifecycle |
+| `tui/editor.py` | prompt_toolkit editor, shortcuts, autosave, async AI operations |
+| `tui/notes_store.py` | Note identity, metadata, migration, locks, atomic writes |
+| `tui/word_wrap.py` | Display-only wrapping and cursor/selection mapping |
+| `tui/transcripts.py` | Correct-session Codex and Claude final-reply readers |
+| `tui/organizer.py` | Prompts, Responses API worker, output validation, cancellation |
+| `tui/tests/` | Storage, editor, transcript, identity, API, and wrapping checks |
+| `tui/vendor/` | Vendored dependencies from `requirements.txt` |
+| `gui/main.js` | The app mod: toggle (as a popup) and the editor pane, keys, lifecycle |
+| `gui/mod.json` | Mod placement, pane title, focusability, toggle popup size |
+| `gui/lib/store.js` | Port of `notes_store.py`: same keys, files, aliases, locks |
+| `gui/lib/locks.js` | flock compatible with Python's, held by a `lockf`/`flock` helper |
+| `gui/lib/transcripts.js` | Port of `transcripts.py` (SQLite via `sqlite3 -readonly`) |
+| `gui/lib/organizer.js` | Port of `organizer.py`; a login-zsh `curl` worker |
+| `gui/lib/host.js` | App panes to the TUI's source dicts; Claude IDs from `sessions/<pid>.json` |
+| `gui/lib/sys.js`, `util.js` | Host operations for the app; UTF-8, sha256, Python-compatible JSON |
+| `gui/tests/` | Node tests, most compared against the Python code via `py_oracle.py` |
 
-Python 3.10+; dependencies are already vendored. No build step or runtime package
-installation is needed. Change dependencies deliberately, not as routine setup.
+TUI: Python 3.10+; dependencies are already vendored. No build step or runtime
+package installation is needed. Change dependencies deliberately, not as routine
+setup. GUI: plain ES modules run by the Herdr app; Node 18+ only for tests. The app
+writes `gpui-kit.d.ts`, `herdr.d.ts` and `jsconfig.json` into `gui/` on start
+(ignored by git); read them for the app's API, never edit them. The app's script
+runtime has no `TextEncoder`/`TextDecoder`, and the Write tool can turn ` `
+escapes into raw line separators that break regex literals: check after editing.
 
 ## Interaction contract
 
 - **prefix+z** (currently Ctrl+B, then z) opens/focuses notes from an agent and
   closes them from the notes pane. The binding lives in `~/.config/herdr/config.toml`.
+  In the Herdr app the same toggle is **Cmd+Shift+N** (`"cmd-shift-n":
+  "mod.open:conversation-notes"` in `~/.config/herdr-app/keys.json`).
 - **Ctrl+Q** saves and closes; **Ctrl+S** saves. Ordinary Enter inserts a newline.
 - **Ctrl+C** copies the selection, or the whole note with no selection. Mouse
   selection copies too. **Ctrl+V** pastes; terminal bracketed paste stays multiline.
@@ -60,8 +84,15 @@ installation is needed. Change dependencies deliberately, not as routine setup.
 
 Default state: `~/.local/state/herdr/plugins/shyam.conversation-notes/`.
 `HERDR_PLUGIN_STATE_DIR` can override it. Markdown files live in `notes/<hash>.md`
-with metadata and locks; `aliases/` tracks identities and `panels/` runtime state.
-Use `python3 notes.py path --pane <pane-id>` inside Herdr to locate a note.
+with metadata and locks; `aliases/` tracks identities and `panels/` runtime state
+(TUI only). The GUI adds `requests/` (transient OpenAI request bodies) and, while a
+note is open there, a `<key>.lock.gui-<id>` named pipe for its lock helper.
+Use `python3 tui/notes.py path --pane <pane-id>` inside Herdr to locate a note.
+
+Both implementations must produce identical keys (`sha256` of Python's
+`json.dumps(identity, ensure_ascii=False)`) and honor each other's flock. The GUI's
+terminal identity uses `herdr-core:<core id>` as its server; Claude's native ID comes
+from Claude Code's `sessions/<pid>.json`. Codex has no native ID in the GUI.
 
 Keep native agent/session identity as the note key, not the title or pane position.
 Before a native ID is known, isolate by server/terminal identity and migrate when
@@ -121,11 +152,20 @@ redirect protection, and rejection of incomplete or malformed responses.
 
 ## Development and verification
 
-Run relevant checks from this directory; the full headless suite is:
+The full headless suites:
 
 ```sh
-python3 -m unittest discover -s tests -v
+cd tui && python3 -m unittest discover -s tests -v
+cd gui && node --test --test-timeout=60000 tests/*.test.mjs
+herdr-app check ~/.config/herdr-app/mods/conversation-notes
 ```
+
+The GUI tests call the Python code through `gui/tests/py_oracle.py`; when Python
+behavior changes, port it and extend the comparison. For a live GUI check, open a
+notes pane with `props.state_dir` pointing at a scratch folder (never the real
+store) in a test space you create and remove; the window must be visible to draw,
+and mods start only when first drawn. Do not automate keys or the pointer on the
+user's display; ask the user to try shortcuts.
 
 Use temporary state directories, synthetic transcripts/notes, mocked API calls,
 and in-memory clipboard backends for automated checks. For an appropriate live
@@ -139,8 +179,9 @@ before substantial edits. Existing backups live under
 `~/.config/herdr/plugin-backups/`. Keep usage documentation and relevant validation
 records current when behavior changes; bump the manifest version when appropriate.
 
-Open panels keep their loaded Python code. To pick up normal source changes,
-**Ctrl+Q, then prefix+z**; a Herdr reload is unnecessary. Binding/configuration
+Open TUI panels keep their loaded Python code. To pick up normal source changes,
+**Ctrl+Q, then prefix+z**; a Herdr reload is unnecessary. The app reloads the GUI
+mod whenever a file in `gui/` is saved. Binding/configuration
 changes may require a reload. Before live Herdr control, read the installed help
 or applicable Herdr instructions, use `HERDR_ENV=1` and explicit pane IDs, and avoid
 closing user agent panes, stopping the server, or changing real notes for tests.

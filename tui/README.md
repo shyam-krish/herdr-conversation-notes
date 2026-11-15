@@ -1,6 +1,8 @@
-# Herdr Conversation Notes
+# Herdr Conversation Notes (TUI)
 
 A small personal Herdr plugin: a real multiline editor beside each conversation.
+This is the terminal Herdr plugin; the Herdr app version is in [`../gui`](../gui/README.md).
+Both share one note store, so a conversation's notes are the same in each.
 
 ## Use
 
@@ -138,10 +140,12 @@ importer use Python's standard library and call `https://api.openai.com/v1/respo
 on demand. Ordinary editing uses Herdr's local socket and the local filesystem.
 The native clipboard tools run on demand.
 
+Run these from this `tui/` folder:
+
 ```sh
 python3 -m pip install --target vendor -r requirements.txt
 python3 -m unittest discover -s tests -v
-herdr plugin link /absolute/path/to/herdr-conversation-notes
+herdr plugin link /absolute/path/to/herdr-conversation-notes/tui
 ```
 
 Bind your preferred key to the `shyam.conversation-notes.toggle` plugin action.
