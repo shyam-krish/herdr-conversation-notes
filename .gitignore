@@ -24,9 +24,17 @@ venv/
 *~
 *.bak
 
-# Note storage if HERDR_PLUGIN_STATE_DIR points at this directory
-/notes/
-/aliases/
-/panels/
-/*.lock
-/.notes-*
+# Note storage if HERDR_PLUGIN_STATE_DIR points at the TUI plugin directory
+/tui/notes/
+/tui/aliases/
+/tui/panels/
+/tui/*.lock
+/tui/.notes-*
+
+# Written into the GUI mod folder by the Herdr app on every start
+/gui/gpui-kit.d.ts
+/gui/herdr.d.ts
+/gui/jsconfig.json
+
+# Node tooling for the GUI's headless tests
+node_modules/
